@@ -2,6 +2,7 @@
 
 const char* ssid = "iiNetC2DAD7";
 const char* password = "aM9PrxcbtkS";
+int pin = 5;
 
 WiFiServer server(301); //just pick any port number you like
 WiFiClient client;
@@ -9,9 +10,13 @@ WiFiClient client;
 void setup() {
   Serial.begin(115200);
   delay(10);
-Serial.println(WiFi.localIP());  
+  Serial.println(WiFi.localIP());  
+
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, 1);
+  
+  pinMode(pin, OUTPUT);
+  digitalWrite(pin, 0);
 
   Serial.println();
   Serial.print("Connecting to ");
@@ -48,8 +53,12 @@ void loop() {
   Serial.println(req);
   if (req.indexOf("/87") != -1) { //Is password correct?
     digitalWrite(LED_BUILTIN, 0);
+    digitalWrite(pin, 1);
+//    tone(pin, 400);
     delay(500);
-    digitalWrite(LED_BUILTIN, 1);      
+    digitalWrite(LED_BUILTIN, 1);
+    digitalWrite(pin, 0);
+//  noTone(pin);
     GenerateResponse("Password is correct");
   }
   else if(req.indexOf("favicon.ico") == -1) {
