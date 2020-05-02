@@ -4,15 +4,15 @@
 #include <WiFiUdp.h>
 #include <NTPClient.h>
 
-const String ssid = "iiNetC2DAD7";
-const String wifiPassword = "aM9PrxcbtkS";
-const String password = "87";
+const String ssid = "ssid";
+const String wifiPassword = "password";
+const String passwordToOpenDoor = "87";
 
 const int doorPin = 5;
 const int buzzerPin = 4;
 const int toneDuration = 1000;
 
-const int lockedOutTimeInSeconds = 10;
+const int lockedOutTimeInSeconds = 60;
 const int maxBadPasswordCount = 3;
 int badPasswordCount = 0;
 long timeWhenUserCanTryNewPassword = 0;
@@ -78,7 +78,7 @@ void loop() {
     long remainingLockOutTime = timeWhenUserCanTryNewPassword - currentEpochTime;
     GenerateResponse("Please wait " + String(remainingLockOutTime) + " seconds");
   }
-  else if (req.indexOf("/" + password) != -1) { //Is password correct?
+  else if (req.indexOf("/" + passwordToOpenDoor) != -1) { //Is password correct?
     GenerateResponse("Password is correct");
     OpenDoor();
     CorrectPasswordSound();    
