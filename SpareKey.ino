@@ -10,6 +10,7 @@ const String password = "87";
 
 const int doorPin = 5;
 const int buzzerPin = 4;
+const int toneDuration = 1000;
 
 const int lockedOutTimeInSeconds = 10;
 const int maxBadPasswordCount = 3;
@@ -80,7 +81,7 @@ void loop() {
   else if (req.indexOf("/" + password) != -1) { //Is password correct?
     GenerateResponse("Password is correct");
     OpenDoor();
-    MakeSound();
+    CorrectPasswordSound();    
     badPasswordCount = 0;
   }
   //Got a GET request and it wasn't the favicon.ico request, must have been a bad password:
@@ -92,7 +93,8 @@ void loop() {
     else { //Disrupt brute-force attacks:      
       GenerateResponse("Password is incorrect. Please wait " + String(lockedOutTimeInSeconds) + " seconds.");
       timeWhenUserCanTryNewPassword = GetCurrentEpochTime() + lockedOutTimeInSeconds;
-      badPasswordCount = 0;      
+      badPasswordCount = 0;
+      TooManyIncorrectPasswordsSound();
     }
   }
 }
@@ -122,15 +124,19 @@ void GenerateResponse(String text) {
   delay(1);
 }
 
-void MakeSound() {    
-  int toneDuration = 1000;
-  tone(buzzerPin, 400);
-  delay(toneDuration);
-  noTone(buzzerPin);
-  tone(buzzerPin, 800);
-  delay(toneDuration);
-  noTone(buzzerPin);
-  tone(buzzerPin, 1200);
-  delay(toneDuration);
-  noTone(buzzerPin);
+void CorrectPasswordSound() {
+  //Play 4 sounds, 1600, 1700, 1800, 1900Hz
+  for(int i = 16; i < 20; i++){
+    int frequency = i * 100;
+    tone(buzzerPin, frequency);
+    delay(toneDuration);
+    noTone(buzzerPin);
+  }
+}
+
+void TooManyIncorrectPasswordsSound() {  
+  int frequency = 400;    
+  tone(buzzerPin, frequency);
+  delay(3 * toneDuration);
+  noTone(buzzerPin);  
 }
