@@ -1,8 +1,8 @@
 //This code is a modified version of https://cdn.instructables.com/ORIG/FFD/AL3D/IN3EI5D1/FFDAL3DIN3EI5D1.txt
 //Pin Reference: https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/
 #include <ESP8266WiFi.h>
-//#include <WiFiUdp.h>
-//#include <NTPClient.h>
+#include <WiFiUdp.h>
+#include <NTPClient.h>
 
 const char* ssid = "iiNetC2DAD7";
 const char* wifiPassword = "aM9PrxcbtkS";
@@ -10,10 +10,12 @@ const char* passwordToOpenDoor = "/87"; //password should begin with a slash
 
 const int doorPin = 5;
 const int buzzerPin = 4;
-const int toneDuration = 1000;
-//
-//WiFiUDP ntpUDP;
-//NTPClient timeClient(ntpUDP, "pool.ntp.org", 0);
+const int toneDuration = 700;
+
+int numOfRequests = 0;
+
+WiFiUDP ntpUDP;
+NTPClient timeClient(ntpUDP, "pool.ntp.org", 0);
 
 WiFiServer server(301); //Pick any port number you like
 WiFiClient client;
@@ -23,7 +25,7 @@ void setup() {
   delay(10);
   Serial.println(WiFi.localIP());
 
-//  timeClient.begin();
+  timeClient.begin();
   
   pinMode(LED_BUILTIN, OUTPUT);
   digitalWrite(LED_BUILTIN, 1);
@@ -49,59 +51,67 @@ void setup() {
 
   server.begin();
   Serial.println("Server started. Diagnostics info:");
-  Serial.println(WiFi.localIP());   
+  Serial.println(WiFi.localIP());
 }
 
 void loop() {
-//  long currentTime = GetCurrentEpochTime();
-//  if (currentTime % 1800 == 0) { //has 30mins passed? If so, restart.
-//    FlashLed();    
-//      ESP.reset();
-////    ESP.restart();
-//    return;
-//  }
-    
+  ResetServer();
   client = server.available();
   if (!client) {    
     return;
   }
-  
-  delay(1);
-  if(client.available()) {    
-    String request = client.readStringUntil('\r'); 
-    client.flush();
-  
-    Serial.println(request);  
-    if (request.indexOf(passwordToOpenDoor) != -1) { //Is password correct?    
-      GenerateResponse("Password is correct");
-      OpenDoor();
-      CorrectPasswordSound();    
-    }
-    //Got a GET request and it wasn't the favicon.ico request, must have been a bad password:
-    else if (request.indexOf("favicon.ico") == -1) {  
-      GenerateResponse("Password is incorrect.");
-    }
+
+  while(!client.available()){
+    delay(1);  
+  }
+    
+  String request = client.readStringUntil('\r'); 
+  client.flush();
+
+  Serial.println(request);  
+  if (request.indexOf(passwordToOpenDoor) != -1) { //Is password correct?    
+    GenerateResponse("Password is correct");
+    OpenDoor();
+    CorrectPasswordSound();    
+  }
+  //Got a GET request and it wasn't the favicon.ico request, must have been a bad password:
+  else if (request.indexOf("favicon.ico") == -1) {  
+    GenerateResponse("Password is incorrect.");
+  }  
+}
+
+void ResetServer() {
+  long currentTime = GetCurrentEpochTime();
+  long timeInterval = 300; //5mins
+  if (currentTime % timeInterval == 0) { //has timeInterval passed? If so, restart.
+    FlashLed();
+    server.stop();
+    delay(1000);
+    server.begin();
+//    ESP.reset();
+//    ESP.restart();
+    return;
   }
 }
 
-//void FlashLed(){
-//  digitalWrite(LED_BUILTIN, 0);  
-//  delay(300);
-//  digitalWrite(LED_BUILTIN, 1);
-//  delay(300);
-//  digitalWrite(LED_BUILTIN, 0);  
-//  delay(300);
-//  digitalWrite(LED_BUILTIN, 1);  
-//  delay(300);
-//  digitalWrite(LED_BUILTIN, 0);  
-//  delay(300);
-//  digitalWrite(LED_BUILTIN, 1);
-//}
+void FlashLed(){
+  digitalWrite(LED_BUILTIN, 0);  
+  delay(300);
+  digitalWrite(LED_BUILTIN, 1);
+  delay(300);
+  digitalWrite(LED_BUILTIN, 0);  
+  delay(300);
+  digitalWrite(LED_BUILTIN, 1);  
+  delay(300);
+  digitalWrite(LED_BUILTIN, 0);  
+  delay(300);
+  digitalWrite(LED_BUILTIN, 1);
+}
 
-//long GetCurrentEpochTime(){
-//  timeClient.update();
-//  return timeClient.getEpochTime();
-//}
+long GetCurrentEpochTime(){
+  timeClient.update();
+  return timeClient.getEpochTime();
+}
 
 void OpenDoor() {
   digitalWrite(LED_BUILTIN, 0); //flash the onboard LED to help during testing.
@@ -117,6 +127,8 @@ void GenerateResponse(String text) {
   s += "Content-Type: text/html\r\n\r\n";
   s += "<!DOCTYPE HTML>\r\n<html>\r\n";
   s += "<br><h1><b>" + text + "</b></h1>";
+  s += "<br><h1><b>Bytes left on heap: " + String(ESP.getFreeHeap()) + "</b></h1>";
+  s += "<br><h1><b>Num of requests: " + String(++numOfRequests) + "</b></h1>";  
   s += "</html>\n";
   client.flush();
   client.print(s);
