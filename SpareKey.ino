@@ -1,6 +1,8 @@
 //This code is a modified version of https://cdn.instructables.com/ORIG/FFD/AL3D/IN3EI5D1/FFDAL3DIN3EI5D1.txt
+//https://www.instructables.com/id/Control-ESP8266-Over-the-Internet-from-Anywhere/
 //Pin Reference: https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/
 #include <ESP8266WiFi.h>
+#include <ESP8266WiFiGratuitous.h>
 //#include <WiFiUdp.h>
 //#include <NTPClient.h>
 //#include <string.h>
@@ -43,7 +45,7 @@ void setup() {
   Serial.print("Connecting to ");
   Serial.println(ssid);
 
-  WiFi.begin(ssid, wifiPassword);
+  WiFi.begin(ssid, wifiPassword); 
 
   while (WiFi.status() != WL_CONNECTED) {
     delay(500);
@@ -51,6 +53,8 @@ void setup() {
   }
   Serial.println("");
   Serial.println("WiFi connected");
+
+  experimental::ESP8266WiFiGratuitous::stationKeepAliveSetIntervalMs();
 
   server.begin();
   Serial.println("Server started.");
@@ -68,20 +72,16 @@ void loop() {
     delay(1);  
   }
     
-//  String request = client.readStringUntil('\r');
   char request[input_buffer_length];
   client.readBytesUntil('\r', request, input_buffer_length);  
-  client.flush();
   Serial.println(request);
   
-//  if (request.indexOf(passwordToOpenDoor) != -1) { //Is password correct?
-  if(strstr(request, passwordToOpenDoor)) {
+  if(strstr(request, passwordToOpenDoor)) {//Is password correct?
     GenerateResponse("Password is correct");
     OpenDoor();
     CorrectPasswordSound();
   }
   //Got a GET request and it wasn't the favicon.ico request, must have been a bad password:
-//  else if (request.indexOf("favicon.ico") == -1) {
   else if (!strstr(request, "favicon.ico")) {
     GenerateResponse("Password is incorrect.");
   }  
@@ -127,19 +127,6 @@ void OpenDoor() {
   digitalWrite(LED_BUILTIN, 1);
   digitalWrite(doorPin, 0);
 }
-
-//void GenerateResponse(String text) {
-//  Serial.println(text);
-//  String s = "HTTP/1.1 200 OK\r\n";
-//  s += "Content-Type: text/html\r\n\r\n";
-//  s += "<!DOCTYPE HTML>\r\n<html>\r\n";
-//  s += "<br><h1><b>" + text + "</b></h1>";
-//  s += "<br><h1><b>Bytes left on heap: " + String(ESP.getFreeHeap()) + "</b></h1>";
-//  s += "<br><h1><b>Num of requests: " + String(++numOfRequests) + "</b></h1>";  
-//  s += "</html>\n";
-//  client.flush();
-//  client.print(s);  
-//}
 
 void GenerateResponse(const char *text) {
   Serial.println(text);
