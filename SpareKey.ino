@@ -14,6 +14,9 @@ const int buzzerPin = 16;
 const int toneDuration = 700;
 const int buzzerChannel = 0;
 
+const int lockedOutTimeInSeconds = 10;
+const int maxBadPasswordCount = 3;
+
 const int LED_BUILTIN = 2;
 
 boolean haveClient = false;
@@ -110,4 +113,11 @@ void CorrectPasswordSound() {
     tone(buzzerPin, frequency, toneDuration, buzzerChannel);
     noTone(buzzerPin, buzzerChannel);
   }
+}
+
+void TooManyIncorrectPasswordsSound() {  
+  int frequency = 400;    
+  int badPasswordToneDuration = 3 * toneDuration;
+  tone(buzzerPin, frequency, badPasswordToneDuration, buzzerChannel);  
+  noTone(buzzerPin, buzzerChannel);  
 }
