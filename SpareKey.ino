@@ -1,8 +1,7 @@
-//This code is a modified version of https://cdn.instructables.com/ORIG/FFD/AL3D/IN3EI5D1/FFDAL3DIN3EI5D1.txt
-//https://www.instructables.com/id/Control-ESP8266-Over-the-Internet-from-Anywhere/
-//Pin Reference: https://randomnerdtutorials.com/esp8266-pinout-reference-gpios/
-#include <ESP8266WiFi.h>
-#include <millisDelay.h>
+//Pin Reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
+//Tone library: https://github.com/lbernstone/Tone
+#include <WiFi.h>
+#include <Tone32.h>
 
 const size_t input_buffer_length = 256;
 
@@ -10,24 +9,24 @@ const char* ssid = "iiNetC2DAD7";
 const char* wifiPassword = "aM9PrxcbtkS";
 const char* passwordToOpenDoor = "/87"; //password should begin with a slash
 
-const int doorPin = 5;
-const int buzzerPin = 4;
+const int doorPin = 17;
+const int buzzerPin = 16;
 const int toneDuration = 700;
+const int buzzerChannel = 0;
 
-millisDelay delayTime;
+const int LED_BUILTIN = 2;
+
+boolean haveClient = false;
 
 WiFiServer server(301); //Pick any port number you like
-WiFiClient client;
 
 void setup() {
-  delayTime.start(600000); //10 mins
-  
   Serial.begin(115200);
   delay(10);
   Serial.println(WiFi.localIP());
   
   pinMode(LED_BUILTIN, OUTPUT);
-  digitalWrite(LED_BUILTIN, 1);
+  digitalWrite(LED_BUILTIN, 0);
 
   pinMode(doorPin, OUTPUT);
   digitalWrite(doorPin, 0);
@@ -52,44 +51,38 @@ void setup() {
   Serial.println(WiFi.localIP());  
 }
 
-void(* resetFunc) (void) = 0;
-
-void loop() {  
-  if (delayTime.justFinished()) {
-    Serial.println("10secs passed. Reseting...");
-    resetFunc();
-    delayTime.repeat();
-  } 
-  
+void loop() {      
   WiFiClient client = server.available();
-  if (!client) {    
-    return;
+
+  if (client) {    
+    haveClient = true;
+  } 
+  else {
+    haveClient = false;
   }
 
-  while(!client.available()){
-    delay(1);  
-  }
+  if(haveClient && client.available()){    
+    char request[input_buffer_length];
+    client.readBytesUntil('\r', request, input_buffer_length);  
+    Serial.println(request);
     
-  char request[input_buffer_length];
-  client.readBytesUntil('\r', request, input_buffer_length);  
-  Serial.println(request);
-  
-  if(strstr(request, passwordToOpenDoor)) {
-    GenerateResponse(client, "Password is correct.");
-    OpenDoor();
-    CorrectPasswordSound();
-  }  
-  else if (!strstr(request, "favicon.ico")) {
-    //Got a GET request and it wasn't the favicon.ico request, must have been a bad password:
-    GenerateResponse(client, "Password is incorrect.");
-  }  
+    if(strstr(request, passwordToOpenDoor)) {
+      GenerateResponse(client, "Password is correct.");
+      OpenDoor();
+      CorrectPasswordSound();
+    }  
+    else if (!strstr(request, "favicon.ico")) {
+      //Got a GET request and it wasn't the favicon.ico request, must have been a bad password:
+      GenerateResponse(client, "Password is incorrect.");
+    }  
+  }
 }
 
 void OpenDoor() {
-  digitalWrite(LED_BUILTIN, 0); //flash the onboard LED to help during testing.
+  digitalWrite(LED_BUILTIN, 1); //flash the onboard LED to help during testing.
   digitalWrite(doorPin, 1);
   delay(500);
-  digitalWrite(LED_BUILTIN, 1);
+  digitalWrite(LED_BUILTIN, 0);
   digitalWrite(doorPin, 0);
 }
 
@@ -104,17 +97,17 @@ void GenerateResponse(WiFiClient& client, const char *text) {
       "<br><h1><b>"
   );
   client.print(text);
-  client.print("</b></h1><br><h1><b>Come on up to level 5 :)");  
-  client.print("</b></h1></html>\r\n");
-  client.flush();  
+  client.print("</b></h1>");
+  client.print("<br><h1><b>Come on up to level 5 :)</b></h1>");  
+  client.print("</html>\r\n");
+  client.flush();
 }
 
 void CorrectPasswordSound() {
   //Play 1700, 1800, 1900Hz
   for(int i = 17; i < 20; i++){
     int frequency = i * 100;
-    tone(buzzerPin, frequency);
-    delay(toneDuration);
-    noTone(buzzerPin);
+    tone(buzzerPin, frequency, toneDuration, buzzerChannel);
+    noTone(buzzerPin, buzzerChannel);
   }
 }
