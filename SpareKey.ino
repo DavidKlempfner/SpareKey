@@ -2,12 +2,21 @@
 //Tone library: https://github.com/lbernstone/Tone
 #include <WiFi.h>
 #include <Tone32.h>
+#include <ESP32_MailClient.h>
+#include <HTTPClient.h>
 
 const size_t input_buffer_length = 256;
 
 const char* ssid = "iiNetC2DAD7";
 const char* wifiPassword = "aM9PrxcbtkS";
 const char* passwordToOpenDoor = "/87"; //password should begin with a slash
+
+const char* emailSenderAccount = "notifieripchange1@gmail.com";
+const char* emailSenderPassword = "Test1234!";
+const char* emailRecipient = "dklempfner@gmail.com";
+const char* smtpServer = "smtp.gmail.com";
+const int smtpServerPort = 465;
+const char* emailSubject = "Your public IP address has changed";
 
 const int doorPin = 17;
 const int buzzerPin = 16;
@@ -17,6 +26,14 @@ const int buzzerChannel = 0;
 const int LED_BUILTIN = 2;
 
 boolean haveClient = false;
+
+boolean hasIPChanged = true;
+
+// The Email Sending data object contains config and data to send
+SMTPData smtpData;
+
+// Callback function to get the Email sending status
+void sendCallback(SendStatus info);
 
 WiFiServer server(301); //Pick any port number you like
 
@@ -51,7 +68,14 @@ void setup() {
   Serial.println(WiFi.localIP());  
 }
 
-void loop() {      
+void loop() {
+  if(hasIPChanged){
+    getIPAddress();
+    char newIPAddress[16] = "123.223.443.123";   
+    sendIPChangedEmail(newIPAddress);
+    hasIPChanged = false;
+  }
+
   WiFiClient client = server.available();
 
   if (client) {    
@@ -76,6 +100,54 @@ void loop() {
       GenerateResponse(client, "Password is incorrect.");
     }  
   }
+}
+
+void getIPAddress(){
+  HTTPClient http;
+  Serial.println("begin http");
+//  http.begin("https://api.ipify.org"); //Specify the URL
+  http.begin("http://jsonplaceholder.typicode.com/comments?id=10"); //Specify the URL  
+  Serial.println("finish begin http, start get...");
+  int httpCode = http.GET();                                        //Make the request
+  Serial.println("finished get...");
+
+  if (httpCode > 0) { //Check for the returning code
+      //.toCharArray(buf, len)
+      String payload = http.getString();
+      Serial.println(httpCode);
+      Serial.println(payload);
+    }
+
+  else {
+    Serial.println("Error on HTTP request");
+  }
+
+  http.end(); //Free the resources
+}
+
+void sendCallback(SendStatus msg) {
+  Serial.println(msg.info());
+ 
+  if (msg.success()) {
+    Serial.println("Email was sent successfully.");
+  }
+}
+
+void sendIPChangedEmail(const char *newIPAddress){
+  smtpData.setLogin(smtpServer, smtpServerPort, emailSenderAccount, emailSenderPassword);
+  smtpData.setSender("ESP32", emailSenderAccount);
+  smtpData.setPriority("High");
+  smtpData.setSubject(emailSubject);
+//  char newIPAddress[16] = "124.1.43.32";
+  smtpData.setMessage(newIPAddress, false);
+  smtpData.addRecipient(emailRecipient);
+  smtpData.setSendCallback(sendCallback);
+  if (!MailClient.sendMail(smtpData)){
+    Serial.println("Error sending Email, " + MailClient.smtpErrorReason());
+  }
+
+  //Clear all data from Email object to free memory
+  smtpData.empty();
 }
 
 void OpenDoor() {
