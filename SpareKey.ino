@@ -1,14 +1,17 @@
+//https://www.forward.com.au/pfod/ArduinoProgramming/TimingDelaysInArduino.html
 //Pin Reference: https://randomnerdtutorials.com/esp32-pinout-reference-gpios/
+//https://techtutorialsx.com/2017/05/19/esp32-http-get-requests/
 //Tone library: https://github.com/lbernstone/Tone
 #include <WiFi.h>
 #include <Tone32.h>
 #include <ESP32_MailClient.h>
 #include <HTTPClient.h>
+#include <millisDelay.h>
 
 const size_t input_buffer_length = 256;
 
 const char* ssid = "iiNetC2DAD7";
-const char* wifiPassword = "aM9PrxcbtkS";
+const char* wifiPassword = "M9PrxcbtkS";
 const char* passwordToOpenDoor = "/87"; //password should begin with a slash
 
 const char* emailSenderAccount = "notifieripchange1@gmail.com";
@@ -22,14 +25,14 @@ const int doorPin = 17;
 const int buzzerPin = 16;
 const int toneDuration = 700;
 const int buzzerChannel = 0;
-
 const int LED_BUILTIN = 2;
 
 boolean haveClient = false;
+const int lengthOfIPAddress = 16;
+char oldIPAddress[lengthOfIPAddress] = "";
+char newIPAddress[lengthOfIPAddress] = "";
 
-boolean hasIPChanged = true;
-
-// The Email Sending data object contains config and data to send
+millisDelay ipCheckTimer;
 SMTPData smtpData;
 
 // Callback function to get the Email sending status
@@ -66,18 +69,15 @@ void setup() {
   server.begin();
   Serial.println("Server started.");
   Serial.println(WiFi.localIP());  
+
+  ipCheckTimer.start(360000); //360000ms = 6 mins
+  setIPAddress(oldIPAddress);
 }
 
 void loop() {
-  if(hasIPChanged){
-    getIPAddress();
-    char newIPAddress[16] = "123.223.443.123";   
-    sendIPChangedEmail(newIPAddress);
-    hasIPChanged = false;
-  }
-
+  checkForNewIPAddress();
+  
   WiFiClient client = server.available();
-
   if (client) {    
     haveClient = true;
   } 
@@ -102,27 +102,48 @@ void loop() {
   }
 }
 
-void getIPAddress(){
-  HTTPClient http;
-  Serial.println("begin http");
-//  http.begin("https://api.ipify.org"); //Specify the URL
-  http.begin("http://jsonplaceholder.typicode.com/comments?id=10"); //Specify the URL  
-  Serial.println("finish begin http, start get...");
-  int httpCode = http.GET();                                        //Make the request
-  Serial.println("finished get...");
-
-  if (httpCode > 0) { //Check for the returning code
-      //.toCharArray(buf, len)
-      String payload = http.getString();
-      Serial.println(httpCode);
-      Serial.println(payload);
+void checkForNewIPAddress(){
+  if (ipCheckTimer.justFinished()) {
+    Serial.println("timer finished");
+    setIPAddress(newIPAddress);
+    Serial.println("OldIPAddress:");        
+    Serial.println(oldIPAddress);
+    Serial.println("NewIPAddress:");
+    Serial.println(newIPAddress);
+    bool areEqual = strcmp(oldIPAddress, newIPAddress) == 0;
+    Serial.println("are equal?");
+    Serial.println(areEqual);
+    if(!areEqual){
+      copy(newIPAddress, oldIPAddress, lengthOfIPAddress);
+      sendIPChangedEmail(newIPAddress);
     }
+    ipCheckTimer.repeat();
+  }
+}
 
+void copy(char* src, char* dst, int len) {
+    memcpy(dst, src, sizeof(src[0])*len);
+}
+
+void setIPAddress(char* ipAddressBuffer){
+  HTTPClient http;
+  Serial.println("begin http");  
+  http.begin("http://bot.whatismyipaddress.com/"); //Only allowed to call once per 5 mins.
+  Serial.println("Adding header...");
+  http.addHeader("User-Agent", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/81.0.4044.138 Safari/537.36");
+  Serial.println("Start get...");  
+  int httpCode = http.GET();
+  Serial.println("Finished get...");
+
+  if (httpCode > 0) {    
+    http.getString().toCharArray(ipAddressBuffer, lengthOfIPAddress);    
+    Serial.println(httpCode);
+    Serial.println(ipAddressBuffer);
+  }
   else {
     Serial.println("Error on HTTP request");
   }
-
-  http.end(); //Free the resources
+  http.end();
 }
 
 void sendCallback(SendStatus msg) {
@@ -138,15 +159,12 @@ void sendIPChangedEmail(const char *newIPAddress){
   smtpData.setSender("ESP32", emailSenderAccount);
   smtpData.setPriority("High");
   smtpData.setSubject(emailSubject);
-//  char newIPAddress[16] = "124.1.43.32";
   smtpData.setMessage(newIPAddress, false);
   smtpData.addRecipient(emailRecipient);
   smtpData.setSendCallback(sendCallback);
   if (!MailClient.sendMail(smtpData)){
     Serial.println("Error sending Email, " + MailClient.smtpErrorReason());
-  }
-
-  //Clear all data from Email object to free memory
+  }  
   smtpData.empty();
 }
 
