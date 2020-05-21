@@ -107,6 +107,7 @@ void loop() {
           badPasswordCount++;
           if(badPasswordCount == badPasswordCountLimit){
             isLockedOut = true;
+            BadPasswordCountLimitSound();
             lockedOutTimer.start(lockOutTime);
           }
         }
@@ -152,8 +153,14 @@ void setIPAddress(char* ipAddressBuffer){
   int httpCode = http.GET();
   Serial.println("Finished get...");
 
-  if (httpCode > 0) {    
-    http.getString().toCharArray(ipAddressBuffer, lengthOfIPAddress);    
+  if (httpCode > 0) {
+    int index = 0;
+    WiFiClient& stream = http.getStream();    
+    while (stream.available()) {
+      ipAddressBuffer[index] = stream.read();
+      index++;
+    }
+    
     Serial.println(httpCode);
     Serial.println(ipAddressBuffer);
   }
@@ -217,4 +224,11 @@ void CorrectPasswordSound() {
     tone(buzzerPin, frequency, toneDuration, buzzerChannel);
     noTone(buzzerPin, buzzerChannel);
   }
+}
+
+
+void BadPasswordCountLimitSound() {  
+  int frequency = 400;    
+  tone(buzzerPin, frequency, 3 * toneDuration, buzzerChannel);
+  noTone(buzzerPin, buzzerChannel);
 }
