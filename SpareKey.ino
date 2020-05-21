@@ -27,7 +27,7 @@ const int LED_BUILTIN = 2;
 const int lengthOfIPAddress = 16;
 char oldIPAddress[lengthOfIPAddress] = "";
 char newIPAddress[lengthOfIPAddress] = "";
-const int lockOutTime = 20000; //180000ms = 3 mins
+const int lockOutTime = 60000; //180000ms = 3 mins
 const int badPasswordCountLimit = 3;
 int badPasswordCount = 0;
 bool isLockedOut = false;
