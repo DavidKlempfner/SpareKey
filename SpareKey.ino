@@ -13,21 +13,17 @@ const size_t input_buffer_length = 256;
 const char* ssid = "iiNetC2DAD7";
 const char* wifiPassword = "M9PrxcbtkS";
 const char* passwordToOpenDoor = "/87"; //password should begin with a slash
-
 const char* emailSenderAccount = "notifieripchange1@gmail.com";
 const char* emailSenderPassword = "Test1234!";
 const char* emailRecipient = "dklempfner@gmail.com";
 const char* smtpServer = "smtp.gmail.com";
-const int smtpServerPort = 465;
 const char* emailSubject = "Your public IP address has changed";
-
+const int smtpServerPort = 465;
 const int doorPin = 17;
 const int buzzerPin = 16;
 const int toneDuration = 700;
 const int buzzerChannel = 0;
 const int LED_BUILTIN = 2;
-
-boolean haveClient = false;
 const int lengthOfIPAddress = 16;
 char oldIPAddress[lengthOfIPAddress] = "";
 char newIPAddress[lengthOfIPAddress] = "";
@@ -74,51 +70,50 @@ void setup() {
   setIPAddress(oldIPAddress);
 }
 
-void loop() {
-  checkForNewIPAddress();
-  
+void loop() {   
   WiFiClient client = server.available();
-  if (client) {    
-    haveClient = true;
-  } 
-  else {
-    haveClient = false;
-  }
+  if(client){
+    delay(50);
+    if(client.available()){
+      char request[input_buffer_length];
+      client.readBytesUntil('\r', request, input_buffer_length);  
+      Serial.println(request);
 
-  if(haveClient && client.available()){    
-    char request[input_buffer_length];
-    client.readBytesUntil('\r', request, input_buffer_length);  
-    Serial.println(request);
-    
-    if(strstr(request, passwordToOpenDoor)) {
-      GenerateResponse(client, "Password is correct.");
-      OpenDoor();
-      CorrectPasswordSound();
+      bool isPasswordCorrect = strstr(request, passwordToOpenDoor);
+      if(isPasswordCorrect) {
+        GenerateResponse(client, "Password is correct.");
+        OpenDoor();
+        CorrectPasswordSound();
+      }  
+      else if (!strstr(request, "favicon.ico")) {
+        //Got a GET request and it wasn't the favicon.ico request, must have been a bad password:
+        GenerateResponse(client, "Password is incorrect.");
+      }
     }  
-    else if (!strstr(request, "favicon.ico")) {
-      //Got a GET request and it wasn't the favicon.ico request, must have been a bad password:
-      GenerateResponse(client, "Password is incorrect.");
-    }  
+  }
+  
+  if (ipCheckTimer.justFinished()) {    
+    if(hasIPAddressChanged()) {
+      sendIPChangedEmail(newIPAddress);
+    }      
+    ipCheckTimer.repeat();
   }
 }
 
-void checkForNewIPAddress(){
-  if (ipCheckTimer.justFinished()) {
-    Serial.println("timer finished");
-    setIPAddress(newIPAddress);
-    Serial.println("OldIPAddress:");        
-    Serial.println(oldIPAddress);
-    Serial.println("NewIPAddress:");
-    Serial.println(newIPAddress);
-    bool areEqual = strcmp(oldIPAddress, newIPAddress) == 0;
-    Serial.println("are equal?");
-    Serial.println(areEqual);
-    if(!areEqual){
-      copy(newIPAddress, oldIPAddress, lengthOfIPAddress);
-      sendIPChangedEmail(newIPAddress);
-    }
-    ipCheckTimer.repeat();
-  }
+bool hasIPAddressChanged(){  
+  Serial.println("timer finished");
+  setIPAddress(newIPAddress);
+  Serial.println("OldIPAddress:");        
+  Serial.println(oldIPAddress);
+  Serial.println("NewIPAddress:");
+  Serial.println(newIPAddress);
+  bool hasIPAddressChanged = strcmp(oldIPAddress, newIPAddress) != 0;
+  Serial.println("hasIPAddressChanged?");
+  Serial.println(hasIPAddressChanged);
+  if(hasIPAddressChanged){
+    copy(newIPAddress, oldIPAddress, lengthOfIPAddress);    
+  }   
+  return hasIPAddressChanged;
 }
 
 void copy(char* src, char* dst, int len) {
