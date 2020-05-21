@@ -27,7 +27,12 @@ const int LED_BUILTIN = 2;
 const int lengthOfIPAddress = 16;
 char oldIPAddress[lengthOfIPAddress] = "";
 char newIPAddress[lengthOfIPAddress] = "";
+const int lockOutTime = 20000; //180000ms = 3 mins
+const int badPasswordCountLimit = 3;
+int badPasswordCount = 0;
+bool isLockedOut = false;
 
+millisDelay lockedOutTimer;
 millisDelay ipCheckTimer;
 SMTPData smtpData;
 
@@ -66,7 +71,7 @@ void setup() {
   Serial.println("Server started.");
   Serial.println(WiFi.localIP());  
 
-  ipCheckTimer.start(360000); //360000ms = 6 mins
+  ipCheckTimer.start(360000); //6 mins
   setIPAddress(oldIPAddress);
 }
 
@@ -79,20 +84,37 @@ void loop() {
       client.readBytesUntil('\r', request, input_buffer_length);  
       Serial.println(request);
 
-      bool isPasswordCorrect = strstr(request, passwordToOpenDoor);
-      if(isPasswordCorrect) {
-        GenerateResponse(client, "Password is correct.");
-        OpenDoor();
-        CorrectPasswordSound();
-      }  
-      else if (!strstr(request, "favicon.ico")) {
-        //Got a GET request and it wasn't the favicon.ico request, must have been a bad password:
-        GenerateResponse(client, "Password is incorrect.");
+      if(isLockedOut){             
+        if(!lockedOutTimer.justFinished()) {
+          GenerateResponse(client, "You're locked out due to too many bad password attempts. Please try again later."); 
+        }
+        else {          
+          isLockedOut = false;
+          badPasswordCount = 0;
+        }
+      }
+      
+      if(!isLockedOut) {
+        bool isPasswordCorrect = strstr(request, passwordToOpenDoor);
+        if(isPasswordCorrect) {
+          GenerateResponse(client, "Password is correct.");
+          OpenDoor();
+          CorrectPasswordSound();
+        }  
+        else if (!strstr(request, "favicon.ico")) {
+          //Got a GET request and it wasn't the favicon.ico request, must have been a bad password:
+          GenerateResponse(client, "Password is incorrect.");
+          badPasswordCount++;
+          if(badPasswordCount == badPasswordCountLimit){
+            isLockedOut = true;
+            lockedOutTimer.start(lockOutTime);
+          }
+        }
       }
     }  
   }
   
-  if (ipCheckTimer.justFinished()) {    
+  if (ipCheckTimer.justFinished()) {
     if(hasIPAddressChanged()) {
       sendIPChangedEmail(newIPAddress);
     }      
